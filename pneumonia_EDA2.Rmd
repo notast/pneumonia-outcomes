@@ -1,0 +1,319 @@
+---
+title: "pneumonia EDA 2"
+output: 
+  html_document:
+    toc: true # table of content true
+---
+
+# Intro 
+This post is a supplementary material for an assignment. The assignment is part of the Augmented Machine Learning unit for a Specialised Diploma in Data Science for Business. The aim of the assignment is to use `DataRobot` for predictive modelling. Exploratory data analysis and feature engineering will be done here in `R` before the data is imported into `DataRobot`. The aim of this project is to classify if patients with Community Acquired Pneumonia (CAP) became better after seeing a doctor or became worse despite seeing a doctor.  
+<br>
+The variables of the dataset can be classified into 13 categories. The first 8 categories have been explored in the previous post. The remaining categories will be explored in this post. 
+```{r message=F}
+library(here)
+library(tidyverse)
+theme_set(theme_light())
+
+# previously and partial EDA dataset 
+load("CAP_EDA1.RData")
+
+# 13 categories 
+categories13<- readxl::read_excel(here("CAP","Incidence rate of community-acquired pneumonia in adults a population-based prospective active surveillance study in three cities in South America.xls"), sheet=3)
+
+categories13 %>%  DT::datatable(rownames = F, options = list(searchHighlight = TRUE, paging= T))
+```
+Customized EDA functions from the previous post will be used here. 
+```{r message=F}
+dtype<- function(datafr, x){
+datafr%>% select(starts_with(x, ignore.case = F)) %>% str()
+}
+
+eda_c<- function(datafr,x){
+  datafr %>% select(starts_with(x, ignore.case = F)) %>%  map(~ table(.x, useNA = "always"))
+}
+
+eda_n_NAplt<- function (datafr, x){
+  datafr %>% select(starts_with(x, ignore.case = F)) %>% summarise(across(starts_with(x), ~mean(is.na(.)))) %>% pivot_longer(cols = everything(), names_to= "Variables" , values_to="pct_na") %>% mutate(Variables= fct_reorder(Variables, pct_na)) %>% ggplot(aes(x=Variables, y=pct_na, fill= pct_na))+ geom_col() + coord_flip() + scale_y_continuous(labels=scales::percent_format()) + scale_fill_viridis_c(option = "plasma")}
+
+eda_n_NAcutoff<- function(datafr, x, low, high){
+  datafr%>% select(starts_with(x, ignore.case = F)) %>% summarise(across(starts_with(x), ~mean(is.na(.)))) %>% pivot_longer(cols = everything(), names_to="Variables", values_to="pct_na") %>% filter((pct_na>low & pct_na<high)) %>% pull(Variables)}
+
+eda_n_outlier<-function(datafr, x_selected){
+# nested df with plots
+  plt<-datafr %>% select(all_of(x_selected)) %>% pivot_longer(cols=everything(),names_to="Variables", values_to="values") %>% nest(-Variables) %>% mutate(plot= map2(.x= data, .y= Variables, 
+~ggplot(data=.x, aes(x= values)) + geom_boxplot() + labs(title = .y)
+)) 
+# print the plots
+  for (i in 1:length(x_selected)){
+    p<-plt[[3]][[i]]
+    print(p)}
+  }
+```
+<br>
+
+# 9 `Lab_`  related category  
+Sodium levels `Lab_Na` should be in numeric form but it is registered as a string. Upon closer inspection, there are no characters found in the variable. The variable can be converted into a numeric variable. 
+```{r}
+(dtype(df,"Lab"))
+
+# check for characters
+(df %>% mutate(char= str_detect(Lab_Na, pattern = "[A-z0-9]"))  %>% filter(Lab_Na==T))
+# convert Lab_na to num
+df<-df %>% mutate(Lab_Na=as.numeric(Lab_Na))
+```
+
+## Missing `Lab` values
+More than half of the `Lab_` variables have >40% missing values. These variables will be removed. `Lab_CRPHigh` and `Lab_lactateHigh` are binary variables indicating if CRP `Lab_CRP` and  lactate levels `Lab_lactate` are above normal limits. As `Lab_CRP` and `Lab_lactate` will be dropped due to too many missing values, `Lab_CRPHigh` and `Lab_lactateHigh` will also be dropped . 
+```{r}
+(eda_n_NAplt(df,"Lab"))
+
+# remove unwanted Lab_ col
+lab_selected<-eda_n_NAcutoff(df, "Lab", 0, .40) 
+lab_all<-df %>% select(starts_with("Lab")) %>% colnames()
+lab_removed<-setdiff(lab_all, lab_selected)
+df<- df %>% select(-any_of(lab_removed))
+```
+
+## Outlier `Lab` values 
+The following `Lab` values have numerous outliers warranting further investigation:
+
+-	Haemoglobin levels , `Lab_Hb` >100
+-	 Neutrophil levels , `Lab_Neu`, <35 
+-	Sugar levels, `Lab_Sugar` > 450 
+```{r}
+eda_n_outlier(df, lab_selected)
+```
+
+### High `Lab_Hb` levels 
+[In conventional units, a healthy female has 12-16 g/DL of haemoglobin. In SI units, a healthy female has 120-160 g/L of haemoglobin](https://www.merckmanuals.com/professional/resources/normal-laboratory-values/blood-tests-normal-values#v8508814). Based on the distribution of values `Lab_hb`, the outliers are likely measured in g/L (e.g. 111-149) will need to be converted to g/DL (e.g. 11.1-14.9). 
+```{r}
+(df %>% filter(Lab_Hb>100) %>% select(Lab_Hb))
+
+# insert decimal point 
+df<-df %>% mutate(Lab_Hb= if_else(Lab_Hb>100, Lab_Hb/10, Lab_Hb))
+```
+
+### Low `Lab_Neu` 
+[Neutrophil <40 are considered below normal limits]( https://www.verywellhealth.com/what-are-neutrophils-p2-2249134). The initially hypothesis is that these patients with low neutrophil have either HIV or on immunosuppression drugs. However, majority of these patients have neither. Although, the initial hypothesis was incorrect, there are other differentials for low neutrophil levels. Considering, the number of these outliers is small (n=22), these observations shall be kept. 
+```{r}
+df %>% select (Lab_Neu, Hx_HIV, Hx_immune) %>% filter(Lab_Neu<35)
+```
+
+### High `Lab_Sugar` 
+It is plausible to have [very high sugar levels if the patient has diabetes]( https://healthiack.com/additional-information-on-blood-sugar-levels). All of these outliers have diabetes thus the outlier values are plausible.  
+```{r}
+df %>% filter(Lab_Sugar>450) %>% count(Hx_diabetes)
+```
+<br>
+
+# 10 `CS_` cultures related category
+There are 23 variables under `CS` and the most important variables are `CS_Organism1` and `CS_Organism2` as they indicate which organism is causing the CAP. The majority of the other `CS` variables are methods to identify the organism. However, there are >90% missing values for `CS_Organism1` and `CS_Organism2`  thus the methods of identifying the organisms though may not be missing are useless. All variables under `CS`  will be removed.
+
+```{r}
+(dtype(df, "CS"))
+(eda_n_NAplt(df, "CS"))
+df<-select(df, -starts_with("CS"))
+```
+<br>
+
+# 11 `Abx_` antibiotics related category 
+```{r}
+dtype(df, "Abx")
+```
+The antibiotics category can be divided into 3 sub-categories:
+
+i. Class of empirical antibiotics given  
+ii. Antibiotics given 
+iii. Duration of antibiotics 
+
+## 11i Class of empirical antibiotics given  
+Majority of the  `Abx_ClassOther` are `NA` because they have values in `Abx_Class`.
+```{r}
+eda_n_NAplt(df, "Abx_Class")
+```
+
+Majority of the `NA` `Abx_ClassOther` are `NA` because they have values in `Abx_Class`. 
+```{r}
+df %>% select(starts_with("Abx_Class")) %>% filter(is.na(Abx_ClassOther)) %>% count(Abx_Class)
+```
+
+Map values from `Abx_Class` to replace `NA` values  in `Abx_ClassOther`. After using `Abx_Class` to expand `Abx_ClassOther `, `Abx_Class ` will be dropped.  Rename the updated `Abx_ClassOther` to `Abx_ClassUpdated` for more intuitive understanding of variable name
+```{r}
+df<-df %>% mutate(Abx_ClassOther= case_when(
+  Abx_Class=="Beta-lactams" & is.na(Abx_ClassOther) ~ "Beta-lactams", 
+  Abx_Class=="Beta-lactams + Macrolides" & is.na(Abx_ClassOther) ~"Beta-lactams + Macrolides",
+  Abx_Class=="Beta-lactams + Quinolones" & is.na(Abx_ClassOther) ~ "Beta-lactams + Quinolones",
+  Abx_Class=="Macrolides" & is.na(Abx_ClassOther) ~ "Macrolides", 
+  Abx_Class== "Other" & is.na(Abx_ClassOther) ~ "Other", 
+  Abx_Class== "Quinolones" & is.na(Abx_ClassOther) ~ "Quinolones", 
+  T ~ Abx_ClassOther
+)) %>% 
+  # remove Abx_Classother
+  select(-Abx_Class) %>% 
+  # rename
+  rename(Abx_ClassUpdated= Abx_ClassOther)
+```
+
+## 11ii Antibiotics given 
+There are no missing values for antibiotics given
+```{r}
+df %>% select(starts_with("Abx")) %>% select(- c(ends_with("Start") | ends_with("End") | Abx_Duration | starts_with("Abx_Class")|ends_with("Detail")))  %>% eda_n_NAplt("Abx")
+```
+
+### Number of antibiotics given 
+From the antibiotics given, the number of antibiotics given can be calculated. There are 4 observations with `NA` values being calculated. These observations shall be examined to see if there are missing values or if no antibiotics were given to begin with. (Perhaps, the doctor had high index of suspicion it was a viral CAP. In such situation, antibiotics would be ineffective)  
+```{r}
+## function to extract abx taken by pt (lond df)
+abx_taken_Longdf<- function(dfr){
+  # select case number and abx col 
+  dfr %>% select(Pt_CaseNumber, starts_with("Abx")) %>% 
+  # remove unrelated abx columns 
+  select(- c(ends_with("Start") | ends_with("End") | Abx_Duration | starts_with("Abx_Class")|ends_with("Detail"))) %>% 
+  # into long df  
+    pivot_longer(-Pt_CaseNumber, names_to="Abx_type", values_to="Used") %>% 
+  # filter abx taken
+    filter(Used=="Yes")
+}
+
+## join no of abx taken w main df  
+df<-left_join(x= df, 
+  y=df %>% abx_taken_Longdf() %>%  group_by(Pt_CaseNumber) %>% count(Used, name= "New_Abx_no") %>% ungroup(), 
+          by= "Pt_CaseNumber")
+  
+df %>% count(New_Abx_no)
+
+# convert abx as integer to numeric as Error: Problem with `mutate()` input `Abx_no`. x must be a double vector, not an integer vector. i Input `Abx_no` is `case_when(...)`.
+df<- df %>% mutate(New_Abx_no= as.numeric(New_Abx_no))
+```
+
+Patient `254`, `916`, `964` did not receive any antibiotic. The number of  antibiotics taken will be `0` and the antibiotics duration will also be `0`.  Patient `1864`  received `Macrolides` class antibiotics as an empirical treatment. Fill the number of antibiotics taken as `1` and fill up other antibiotics taken `Abx_OtherYN` as `Yes`  and fill up details of other antibiotics taken `Abx_OtherDetail` as `Macrolides`. 
+```{r}
+df%>% filter(is.na(New_Abx_no)) %>% select(Pt_CaseNumber, starts_with("Abx")) %>% select(- c(ends_with("Start") | ends_with("End") )) %>%  DT::datatable(rownames = F, options = list(searchHighlight = TRUE, paging= T))
+
+# clean up pt 254, 916, 964, 1864
+df<-df %>% mutate(Abx_Duration=case_when(Pt_CaseNumber==254 ~0, Pt_CaseNumber== 964 ~0, T~Abx_Duration),
+   New_Abx_no=case_when(Pt_CaseNumber== 254 ~0, Pt_CaseNumber== 916 ~0, Pt_CaseNumber==964 ~0, Pt_CaseNumber==1864 ~1, T~New_Abx_no),
+   Abx_OtherYN=if_else(Pt_CaseNumber== 1864, "Yes", Abx_OtherYN),
+    Abx_OtherDetail=if_else(Pt_CaseNumber==1864, "Macrolides", Abx_OtherDetail)
+    )
+```
+
+## 11iii Duration of antibiotics 
+12 observations had `NA` antibiotic duration. Mostly like due to some data calculation or data entry error as only 3 observations in the entire dataset did not receive antibiotics.
+```{r}
+(eda_n_NAplt(df, "Abx_Duration"))
+
+(df %>% filter(is.na(Abx_Duration)) %>% distinct(Pt_CaseNumber) %>% count())
+```
+
+All of the patients with missing antibiotic duration took antibiotics.
+```{r}
+df %>% filter(is.na(Abx_Duration)) %>% select(Pt_CaseNumber, New_Abx_no)
+```
+
+An attempt is made to calculate the duration using start and end dates of the antibiotics given. 
+3/12 patients with missing antibiotics duration had the start dates of their antibiotics captured. However, these patients took other antibiotics which did not have the start dates captured. We are unable to impute any of the missing antibiotic duration by calculating the difference in antibiotic start and end dates. We will impute the missing antibiotic duration by other means later. Antibiotic start and end dates will be removed as there are no longer useful and have no predictive power.
+```{r}
+#  abx with start  dates 
+abx_date<-df %>% select(ends_with("Start")) %>% colnames() %>% str_replace("Start","")
+
+# type of abx taken for pt w m/s abx duration 
+abx_ms<-
+  # filter pt with m/s abx_duration
+  df %>% filter(is.na(Abx_Duration)) %>% 
+  # used above function to find out abx taken
+  abx_taken_Longdf() %>% 
+  # distinct abx taken by this group of pts
+  distinct(Abx_type) %>% pull()
+
+# types of abx taken for pt w m/s abx duration which have date of abx captured
+abx_msAndDateStarted<-intersect(abx_date, abx_ms)
+
+# pt w m/s abx duration who took abx with at least one abx start date
+(df %>% filter(is.na(Abx_Duration)) %>% 
+  abx_taken_Longdf() %>% 
+  group_by(Pt_CaseNumber) %>%  filter(any(Abx_type==abx_msAndDateStarted[[1]]) | any(Abx_type==abx_msAndDateStarted[[2]])) %>%   summarise(n=n(), .groups="drop"))
+
+# remove start and end date 
+df<-df %>% select(- c(ends_with("Start") | ends_with("End")))
+```
+<br>
+
+# 12 `Care_` continuum of care status category 
+```{r}
+(dtype(df, "Care"))
+
+(eda_c(df, "Care"))
+```
+
+## replace 99 
+Again `99` appears as outliers for `Care_daysUnfit` and `Care_GP/OutptVisit`. `99` will be replaced with `NA`.
+```{r}
+df<-df %>% mutate(Care_daysUnfit= na_if(Care_daysUnfit, 99),
+              `Care_GP/OutptVisit`= na_if(`Care_GP/OutptVisit`, 99)) 
+```
+
+## Admission status 
+`Care_admit` indicates if the patient was admitted to a hospital and `Care_ICU` indicates if patient had an ICU stay.  324 patients who were hospitalized also had ICU stay. The labels in `Care_admit` will include details to reflect patient who were admitted AND had ICU stay (label as `Yes (w ICU)`). After using information from `Care_ICU` to expand `Care_admit`, `Care_ICU` will be dropped. 
+
+```{r}
+(table(df$Care_admit, df$Care_ICU, useNA = "always"))
+
+
+df<-df %>% mutate(Care_admit= case_when(
+  Care_admit=="Yes" & Care_ICU=="Yes" ~ "Yes (w ICU)",
+  T~ Care_admit)) %>% 
+  select(-Care_ICU)
+
+(df %>% count(Care_admit, name = "new_tally")) 
+```
+
+## Breathing aid 
+`Care_breathingAid` indicates if patient in ICU used any breathing aids. `Care_ breathingAidType` details the type of breathing aids used.
+Details from `Care_breathingAidType` will be integrated into `Care_breathingAid` and the `Care_breathingAidType` will be dropped. 
+```{r}
+(table(df$Care_breathingAid, df$Care_breathingAidType, useNA = "always"))
+
+df<-df %>% mutate(Care_breathingAid= case_when(
+  Care_breathingAid=="Yes" & Care_breathingAidType=="ARM" ~ "ARM",
+  Care_breathingAid=="Yes" & Care_breathingAidType=="CPAP/Bilevel" ~ "CPAP/Bilevel",
+  Care_breathingAid=="Yes" & Care_breathingAidType=="Other" ~ "Other",
+  Care_breathingAid=="Yes" & is.na(Care_breathingAidType) ~ "Other",
+  T~ Care_breathingAid)) %>% select(-Care_breathingAidType)
+
+(count(df, Care_breathingAid, name = "new_tally"))
+```
+<br>
+
+# 13 `V_` vaccine related category
+```{r} 
+(dtype(df, "V"))
+(eda_c(df, "V"))
+```
+Currently each `V_` column indicates if the patient has received that particular vaccine. As there are only two columns, the values of both columns will be united to indicate which vaccines the patient has received. 
+```{r}
+df<-df  %>% 
+  mutate(V_pneumococcal= if_else(V_pneumococcal=="Yes", "pneumococcal,", ""),
+              V_flu=if_else(V_flu=="Yes", "flu", "")) %>% 
+  unite(V_vaccine, V_pneumococcal, V_flu, sep = "", remove = T) %>% 
+  mutate(V_vaccine= if_else(V_vaccine=="", "no/unavailable", V_vaccine))
+
+(count(df, V_vaccine))
+```
+
+# Wrap up
+The original dataset had 2302 rows and 176 columns, after EDA the dataset has 2112 rows and 78 columns. More than half of the columns were removed and compressed via EDA. 
+```{r}
+# Clean up intermediate columns created during EDA 
+df<-df %>% select(-Used) %>% rename(Abx_no=New_Abx_no)
+
+dim(df)
+```
+
+The cleaned up dataset is ready for some action.  In the next post, some feature engineering will be done.
+```{r}
+df  %>%  DT::datatable(rownames = F, options = list(searchHighlight = TRUE, paging= T))
+
+save(df, file = "CAP_EDA2.RData")
+```
+
