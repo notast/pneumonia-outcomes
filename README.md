@@ -6,7 +6,9 @@ The dataset consists of 2302 rows and 176 columns. The columns can be grouped in
 ## EDA
 [EDA for the first 8 categories can be found here](https://notast.netlify.app/post/predicting-pneumonia-outcomes-eda-part-1/#to-be-continued.). The output is saved as CAP_EDA1.RData 
 <br>
-[EDA for the 9th to 13th categories can be found here](https://notast.netlify.app/post/predicting-pneumonia-outcomes-eda-part-2/). The output is saved as CAP_EDA12.RData. The orginial dataset had 2302 rows and 176 columns, after EDAand data wrangling the dataset has 2112 rows and 78 columns. 
+[EDA for the 9th to 13th categories can be found here](https://notast.netlify.app/post/predicting-pneumonia-outcomes-eda-part-2/). The output is saved as CAP_EDA12.RData. 
+<br>
+After EDA and data wrangling the dataset has 2112 rows and 78 columns. 
 ## Feature Engineering
 [Feature engineering was done to futher condense variables and also create a few new variables](https://notast.netlify.app/post/predicting-pneumonia-outcomes-feature-engineering/) After feature engineering, the dataset has 2112 rows and 71 variables.
 ## DataRobot
