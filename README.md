@@ -3,7 +3,6 @@ The aim of this project is to classify if patients with Community Acquired Pneum
 This project was part of an assignment which the aim of the assignment was to use `DataRobot` for predictive modelling. Exploratory data analysis and feature engineering was donein `R` before the data was imported into `DataRobot`.
 ## Dataset
 The dataset consists of 2302 rows and 176 columns. The columns can be grouped into 13 categories. 
-
 | #  | Category                        | Category description                                                   | Examples                                                              | Prefix  |
 |----|---------------------------------|------------------------------------------------------------------------|-----------------------------------------------------------------------|---------|
 | 1  | Patient                         | Variables related to patient details                                   | Case number, age                                                      | Pt_     |
@@ -20,16 +19,14 @@ The dataset consists of 2302 rows and 176 columns. The columns can be grouped in
 | 12 | Other                           | Other variables                                                        | The outcome. If patient became better or worse after seeing a doctor. | Other_  |
 | 13 | Vaccine                         | Vaccines patient received                                              | Did patient have a flu vaccine?                                       | V_      |
 
-<br>
-I have appended the metadata to sheet 2 (metadata) and a description of each category to sheet 3 (Category) of the spreadsheet. [More details of the dataset can be found here](https://notast.netlify.app/post/predicting-pneumonia-outcomes-eda-part-1/).
 
+I have appended the metadata to sheet 2 (metadata) and a description of each category to sheet 3 (Category) of the spreadsheet. [More details of the dataset can be found here](https://notast.netlify.app/post/predicting-pneumonia-outcomes-eda-part-1/).
 ## EDA
 [EDA for the first 8 categories can be found here](https://notast.netlify.app/post/predicting-pneumonia-outcomes-eda-part-1/#to-be-continued.). 
-
 <img src="https://github.com/notast/pneumonia-outcomes/blob/master/images/PE%20temp.png" alt="" width="900"/>
-<br>
+\
 [EDA for the 9th to 13th categories can be found here](https://notast.netlify.app/post/predicting-pneumonia-outcomes-eda-part-2/). 
-<br>
+\
 After EDA and data wrangling the dataset has 2112 rows and 78 columns. 
 ## Feature Engineering
 [Feature engineering was done to futher condense variables and also create a few new variables](https://notast.netlify.app/post/predicting-pneumonia-outcomes-feature-engineering/). 
