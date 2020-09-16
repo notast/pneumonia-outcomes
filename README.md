@@ -5,6 +5,9 @@ This project was part of an assignment which the aim of the assignment was to us
 The dataset consists of 2302 rows and 176 columns. The columns can be grouped into 13 categories. I have appended the metadata to sheet 2 (metadata) and a description of each category to sheet 3 (Category) of the spreadsheet. [More details of the dataset can be found here](https://notast.netlify.app/post/predicting-pneumonia-outcomes-eda-part-1/).
 ## EDA
 [EDA for the first 8 categories can be found here](https://notast.netlify.app/post/predicting-pneumonia-outcomes-eda-part-1/#to-be-continued.). The output is saved as CAP_EDA1.RData 
+
+![](https://github.com/notast/pneumonia-outcomes/blob/master/images/PE%20temp.png)
+
 <br>
 [EDA for the 9th to 13th categories can be found here](https://notast.netlify.app/post/predicting-pneumonia-outcomes-eda-part-2/). The output is saved as CAP_EDA12.RData. 
 <br>
