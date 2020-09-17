@@ -33,9 +33,17 @@ After EDA and data wrangling the dataset has 2112 rows and 78 columns.
 <img src="https://github.com/notast/pneumonia-outcomes/blob/master/images/Lump%20abx.png" alt="" width="1000"/>
 <br>
 After feature engineering, the dataset has 2112 rows and 71 variables.
-## DataRobot
+## Modelling
 The cleaned up dataset was imported into `DataRobot` for basic modelling. The [results from the first round of modelling were used for advanced feature selection via the `R` API](https://notast.netlify.app/post/predicting-pneumonia-outcomes-modelling-via-datarobot-api/). A smaller but possibly more influential subset of variables were used in a second round of modelling.
 
 <img src="https://notast.netlify.app/post/2020-09-12-predicting-pneumonia-outcomes-modelling-via-datarobot-api_files/figure-html/unnamed-chunk-17-1.png" alt="" width="600"/>
-<br>
-to be cont.... results after 2 runs of modelling in DataRobot 
+
+
+## Results
+[Models from both runs of modelling were compared. 5/31 models were selected to compare against the holdout set.](https://notast.netlify.app/post/predicting-pneumonia-outcomes-results-using-datarobot-api/) 
+<img src="https://notast.netlify.app/post/2020-09-16-predicting-pneumonia-outcomes-results-using-datarobot-api_files/figure-html/unnamed-chunk-20-1.png" alt="" width="600"/>
+
+
+Light Gradient Boosted Tree was selected as the model for deployment. Light Gradient Boosted Tree had a AUC of 0.926 while tested against an unseen dataset. 
+
+<img src="https://notast.netlify.app/post/2020-09-16-predicting-pneumonia-outcomes-results-using-datarobot-api_files/CAP_unseen%20ROC.png" alt="" width="300"/>
